@@ -29,7 +29,7 @@ export class Engine {
         }
 
         if (snapshot) {
-            const snapshotSnapshot = JSON.parse(snapshot.toString());
+            const snapshotSnapshot = JSON.parse(snapshot.toString()); //stores the orderbooks and user balances
             this.orderbooks = snapshotSnapshot.orderbooks.map((o: any) => new Orderbook(o.baseAsset, o.bids, o.asks, o.lastTradeId, o.currentPrice));
             this.balances = new Map(snapshotSnapshot.balances);
         } else {
@@ -38,7 +38,7 @@ export class Engine {
         }
         setInterval(() => {
             this.saveSnapshot();
-        }, 1000 * 3);
+        }, 1000 * 5);
     }
 
     saveSnapshot() {
@@ -54,6 +54,7 @@ export class Engine {
             case CREATE_ORDER:
                 try {
                     const { executedQty, fills, orderId } = this.createOrder(message.data.market, message.data.price, message.data.quantity, message.data.side, message.data.userId);
+                    // publishes the response to the suscribed user
                     RedisManager.getInstance().sendToApi(clientId, {
                         type: "ORDER_PLACED",
                         payload: {
@@ -394,6 +395,7 @@ export class Engine {
         }
     }
 
+    // predefined balances to show working 
     setBaseBalances() {
         this.balances.set("1", {
             [BASE_CURRENCY]: {
