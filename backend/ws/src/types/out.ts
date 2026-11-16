@@ -1,7 +1,8 @@
-
+// Messages are forwarded unchanged from the engine / db service. Keep in sync with
+// engine/src/types/toWs.ts and db/src/types.ts
 
 export type TickerUpdateMessage = {
-    type: "ticker",
+    stream: string,
     data: {
         c?: string,
         h?: string,
@@ -12,16 +13,27 @@ export type TickerUpdateMessage = {
         id: number,
         e: "ticker"
     }
-} 
+}
 
 export type DepthUpdateMessage = {
-    type: "depth",
+    stream: string,
     data: {
         b?: [string, string][],
         a?: [string, string][],
-        id: number,
         e: "depth"
     }
 }
 
-export type OutgoingMessage = TickerUpdateMessage | DepthUpdateMessage;
+export type TradeAddedMessage = {
+    stream: string,
+    data: {
+        e: "trade",
+        t: number,
+        m: boolean,
+        p: string,
+        q: string,
+        s: string
+    }
+}
+
+export type OutgoingMessage = TickerUpdateMessage | DepthUpdateMessage | TradeAddedMessage;

@@ -1,0 +1,20 @@
+{
+  "name": "cex",
+  "private": true,
+  "description": "Centralised exchange: backend (api, engine, ws, db, mm) + frontend. Run everything with `npm run dev`.",
+  "scripts": {
+    "setup": "npm install && npm run install:all",
+    "install:all": "npm --prefix backend/api install && npm --prefix backend/engine install && npm --prefix backend/ws install && npm --prefix backend/db install && npm --prefix backend/mm install && npm --prefix frontend install",
+    "infra": "docker compose -f backend/docker/docker-compose.yml up -d --wait",
+    "infra:stop": "docker compose -f backend/docker/docker-compose.yml down",
+    "seed": "npm --prefix backend/db run seed:db",
+    "build:backend": "npm --prefix backend/engine run build && npm --prefix backend/ws run build && npm --prefix backend/db run build && npm --prefix backend/mm run build",
+    "services": "concurrently -k -n engine,api,ws,db,cron,web,mm -c blue,green,magenta,yellow,gray,cyan,red \"cross-env REDIS_URL=redis://localhost:6380 WS_PORT=8090 WITH_SNAPSHOT=true npm --prefix backend/engine run start\" \"cross-env REDIS_URL=redis://localhost:6380 WS_PORT=8090 npm --prefix backend/api run start\" \"cross-env REDIS_URL=redis://localhost:6380 WS_PORT=8090 npm --prefix backend/ws run start\" \"cross-env REDIS_URL=redis://localhost:6380 WS_PORT=8090 npm --prefix backend/db run start\" \"npm --prefix backend/db run cron\" \"cross-env VITE_WS_URL=ws://localhost:8090 npm --prefix frontend run dev\" \"wait-on tcp:8081 && npm --prefix backend/mm run start\"",
+    "dev": "npm run infra && npm run build:backend && npm run seed && npm run services"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^10.1.0",
+    "wait-on": "^8.0.1"
+  }
+}

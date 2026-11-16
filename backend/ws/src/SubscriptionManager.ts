@@ -1,63 +1,72 @@
 import { RedisClientType, createClient } from "redis";
 import { UserManager } from "./UserManager";
 
+/**
+ * Keeps one Redis subscription per stream and fans each message out to every user subscribed to it.
+ */
 export class SubscriptionManager {
     private static instance: SubscriptionManager;
-    private subscriptions: Map<string, string[]> = new Map();
-    private reverseSubscriptions: Map<string, string[]> = new Map();
+    private subscriptions: Map<string, Set<string>> = new Map();        // userId -> streams
+    private reverseSubscriptions: Map<string, Set<string>> = new Map(); // stream -> userIds
     private redisClient: RedisClientType;
 
     private constructor() {
-        this.redisClient = createClient();
+        this.redisClient = createClient({ url: process.env.REDIS_URL ?? "redis://localhost:6379" });
+        this.redisClient.on("error", (err) => console.error("Redis error", err));
         this.redisClient.connect();
     }
 
     public static getInstance() {
-        if (!this.instance)  {
+        if (!this.instance) {
             this.instance = new SubscriptionManager();
         }
         return this.instance;
     }
 
-    public subscribe(userId: string, subscription: string) {
-        if (this.subscriptions.get(userId)?.includes(subscription)) {
-            return
+    public subscribe(userId: string, stream: string) {
+        const userStreams = this.subscriptions.get(userId) ?? new Set();
+        if (userStreams.has(stream)) {
+            return;
         }
+        userStreams.add(stream);
+        this.subscriptions.set(userId, userStreams);
 
-        this.subscriptions.set(userId, (this.subscriptions.get(userId) || []).concat(subscription));
-        this.reverseSubscriptions.set(subscription, (this.reverseSubscriptions.get(subscription) || []).concat(userId));
-        if (this.reverseSubscriptions.get(subscription)?.length === 1) {
+        const subscribers = this.reverseSubscriptions.get(stream) ?? new Set();
+        subscribers.add(userId);
+        this.reverseSubscriptions.set(stream, subscribers);
 
-            this.redisClient.subscribe(subscription, this.redisCallbackHandler);
+        // first subscriber of this stream: start listening on redis
+        if (subscribers.size === 1) {
+            this.redisClient.subscribe(stream, this.redisCallbackHandler);
         }
     }
 
-    private redisCallbackHandler = (message: string, channel: string) => {
-        const parsedMessage = JSON.parse(message);
-        this.reverseSubscriptions.get(channel)?.forEach(s => UserManager.getInstance().getUser(s)?.emit(parsedMessage));
-    }
+    public unsubscribe(userId: string, stream: string) {
+        this.subscriptions.get(userId)?.delete(stream);
 
-    public unsubscribe(userId: string, subscription: string) {
-        const subscriptions = this.subscriptions.get(userId);
-        if (subscriptions) {
-            this.subscriptions.set(userId, subscriptions.filter(s => s !== subscription));
+        const subscribers = this.reverseSubscriptions.get(stream);
+        if (!subscribers) {
+            return;
         }
-        const reverseSubscriptions = this.reverseSubscriptions.get(subscription);
-        if (reverseSubscriptions) {
-            this.reverseSubscriptions.set(subscription, reverseSubscriptions.filter(s => s !== userId));
-            if (this.reverseSubscriptions.get(subscription)?.length === 0) {
-                this.reverseSubscriptions.delete(subscription);
-                this.redisClient.unsubscribe(subscription);
-            }
+        subscribers.delete(userId);
+
+        // last subscriber left: stop listening on redis
+        if (subscribers.size === 0) {
+            this.reverseSubscriptions.delete(stream);
+            this.redisClient.unsubscribe(stream);
         }
     }
 
     public userLeft(userId: string) {
         console.log("user left " + userId);
-        this.subscriptions.get(userId)?.forEach(s => this.unsubscribe(userId, s));
+        [...(this.subscriptions.get(userId) ?? [])].forEach(stream => this.unsubscribe(userId, stream));
+        this.subscriptions.delete(userId);
     }
-    
-    getSubscriptions(userId: string) {
-        return this.subscriptions.get(userId) || [];
-    }
+
+    private redisCallbackHandler = (message: string, channel: string) => {
+        const parsedMessage = JSON.parse(message);
+        this.reverseSubscriptions.get(channel)?.forEach(userId =>
+            UserManager.getInstance().getUser(userId)?.emit(parsedMessage)
+        );
+    };
 }

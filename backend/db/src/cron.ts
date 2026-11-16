@@ -1,25 +1,21 @@
-import { Client } from 'pg'; 
+import { pool } from "./config";
 
-const client = new Client({
-    user: 'your_user',
-    host: 'localhost',
-    database: 'my_database',
-    password: 'your_password',
-    port: 5432,
-});
-client.connect();
+const REFRESH_INTERVAL_MS = 10 * 1000;
 
 async function refreshViews() {
-
-    await client.query('REFRESH MATERIALIZED VIEW klines_1m');
-    await client.query('REFRESH MATERIALIZED VIEW klines_1h');
-    await client.query('REFRESH MATERIALIZED VIEW klines_1w');
-
-    console.log("Materialized views refreshed successfully");
+    await pool.query("REFRESH MATERIALIZED VIEW klines_1m");
+    await pool.query("REFRESH MATERIALIZED VIEW klines_1h");
+    await pool.query("REFRESH MATERIALIZED VIEW klines_1w");
 }
 
-refreshViews().catch(console.error);
+async function tick() {
+    try {
+        await refreshViews();
+        console.log("Materialized views refreshed successfully");
+    } catch (e) {
+        console.error("Failed to refresh views", e);
+    }
+}
 
-setInterval(() => {
-    refreshViews()
-}, 1000 * 10 );
+tick();
+setInterval(tick, REFRESH_INTERVAL_MS);

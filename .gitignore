@@ -1,2 +1,5 @@
 api_context.md
 engine_context.md
+node_modules/
+dist/
+.env

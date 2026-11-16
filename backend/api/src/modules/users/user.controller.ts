@@ -1,28 +1,18 @@
-import { type Request, type Response } from 'express';
-import { UserRepository } from '../users/user.repository.ts';
+import { type Request, type Response } from "express";
+import { HttpError } from "../../errors.ts";
+import { UserRepository } from "./user.repository.ts";
 
 const userRepository = new UserRepository();
 
 export class UserController {
   async getProfile(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = req.userId; 
-
-      if (!userId) {
-        res.status(400).json({ error: 'User ID missing' });
-        return;
-      }
-
-      const user = await userRepository.findById(userId);
-      
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-
-      res.status(200).json({ user });
-    } catch (error: any) {
-      res.status(500).json({ error: 'Internal server error' });
+    const user = await userRepository.findById(req.userId!);
+    if (!user) {
+      throw new HttpError(404, "User not found");
     }
+
+    // never send the password hash back
+    const { password: _password, ...profile } = user;
+    res.status(200).json({ user: profile });
   }
 }

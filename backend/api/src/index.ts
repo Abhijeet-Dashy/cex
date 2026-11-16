@@ -1,17 +1,11 @@
-import 'dotenv/config';
-import app from './app.ts';
+import { config } from "./config.ts";
+import app from "./app.ts";
 
-const PORT = process.env.PORT || 3000;
+const server = app.listen(config.port, () => {
+  console.log(`Server is running on http://localhost:${config.port}`, server.address());
+});
 
-const startServer = async () => {
-  try {
-    app.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error('Error starting server:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+server.on("error", (error) => {
+  console.error("Error starting server:", error);
+  process.exit(1);
+});

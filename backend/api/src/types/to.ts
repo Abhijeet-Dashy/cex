@@ -1,5 +1,6 @@
-import { CANCEL_ORDER, CREATE_ORDER, GET_DEPTH, GET_OPEN_ORDERS, ON_RAMP } from "./index.js"
+import { CANCEL_ORDER, CREATE_ORDER, GET_BALANCES, GET_DEPTH, GET_OPEN_ORDERS, ON_RAMP, REGISTER_USER } from "./index.ts";
 
+// Keep in sync with engine/src/types/fromApi.ts
 export type MessageToEngine = {
     type: typeof CREATE_ORDER,
     data: {
@@ -14,23 +15,34 @@ export type MessageToEngine = {
     data: {
         orderId: string,
         market: string,
+        userId: string
     }
 } | {
     type: typeof ON_RAMP,
     data: {
-        amount: string,
         userId: string,
-        txnId: string
+        asset: string,
+        amount: string
+    }
+} | {
+    type: typeof REGISTER_USER,
+    data: {
+        userId: string
+    }
+} | {
+    type: typeof GET_BALANCES,
+    data: {
+        userId: string
     }
 } | {
     type: typeof GET_DEPTH,
     data: {
-        market: string,
+        market: string
     }
 } | {
     type: typeof GET_OPEN_ORDERS,
     data: {
         userId: string,
-        market: string,
+        market: string
     }
-}
+};

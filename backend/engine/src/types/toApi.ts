@@ -1,16 +1,12 @@
 import { type Order } from "../trade/Orderbook.js";
+import { type UserBalance } from "../trade/Balances.js";
 
-export const CREATE_ORDER = "CREATE_ORDER";
-export const CANCEL_ORDER = "CANCEL_ORDER";
-export const ON_RAMP = "ON_RAMP";
-
-export const GET_DEPTH = "GET_DEPTH";
-
+// Keep in sync with api/src/types/index.ts
 export type MessageToApi = {
     type: "DEPTH",
     payload: {
         bids: [string, string][],
-        asks: [string, string][],
+        asks: [string, string][]
     }
 } | {
     type: "ORDER_PLACED",
@@ -33,4 +29,12 @@ export type MessageToApi = {
 } | {
     type: "OPEN_ORDERS",
     payload: Order[]
-}
+} | {
+    type: "BALANCES",
+    payload: UserBalance
+} | {
+    type: "ERROR",
+    payload: {
+        message: string
+    }
+};

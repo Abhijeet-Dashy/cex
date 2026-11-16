@@ -1,52 +1,33 @@
-import { Client } from 'pg';
 import { Router } from "express";
-import { RedisManager } from "../RedisManager.js";
-
-const pgClient = new Client({
-    user: 'your_user',
-    host: 'localhost',
-    database: 'my_database',
-    password: 'your_password',
-    port: 5432,
-});
-pgClient.connect();
+import { HttpError } from "../errors.ts";
+import { isKlineInterval, marketRepository } from "../services/market.repository.ts";
+import { requireMarket } from "../validation.ts";
 
 export const klineRouter = Router();
 
+const parseTime = (value: unknown, name: string): Date | undefined => {
+    if (value === undefined) {
+        return undefined;
+    }
+    const time = new Date(Number(value));
+    if (Number.isNaN(time.getTime())) {
+        throw new HttpError(400, `${name} must be a unix timestamp in milliseconds`);
+    }
+    return time;
+};
+
+// candles for a market, e.g. /klines?symbol=TATA_INR&interval=1m&startTime=...&endTime=...
 klineRouter.get("/", async (req, res) => {
-    const { market, interval, startTime, endTime } = req.query;
-
-    let query;
-    switch (interval) {
-        case '1m':
-            query = `SELECT * FROM klines_1m WHERE bucket >= $1 AND bucket <= $2`;
-            break;
-        case '1h':
-            query = `SELECT * FROM klines_1m WHERE  bucket >= $1 AND bucket <= $2`;
-            break;
-        case '1w':
-            query = `SELECT * FROM klines_1w WHERE bucket >= $1 AND bucket <= $2`;
-            break;
-        default:
-            return res.status(400).send('Invalid interval');
+    const market = requireMarket(req.query.symbol ?? req.query.market);
+    const interval = req.query.interval;
+    if (!isKlineInterval(interval)) {
+        throw new HttpError(400, "interval must be one of 1m, 1h, 1w");
     }
 
-    try {
-        //@ts-ignore
-        const result = await pgClient.query(query, [new Date(startTime * 1000 as string), new Date(endTime * 1000 as string)]);
-        res.json(result.rows.map(x => ({
-            close: x.close,
-            end: x.bucket,
-            high: x.high,
-            low: x.low,
-            open: x.open,
-            quoteVolume: x.quoteVolume,
-            start: x.start,
-            trades: x.trades,
-            volume: x.volume,
-        })));
-    } catch (err) {
-        console.log(err);
-        res.status(500).send(err);
-    }
+    res.json(await marketRepository.getKlines(
+        market,
+        interval,
+        parseTime(req.query.startTime, "startTime"),
+        parseTime(req.query.endTime, "endTime")
+    ));
 });
